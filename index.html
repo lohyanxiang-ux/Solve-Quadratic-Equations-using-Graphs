@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quadratic Graphical Method (SLS Safe)</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 10px; background-color: #f4f7f6; }
+        .container { max-width: 850px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; }
+        
+        /* Navigation Buttons */
+        .type-nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .type-btn { flex: 1; padding: 12px; border: 2px solid #3498db; background: white; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.2s; min-width: 100px; }
+        .type-btn:hover { background: #ebf5fb; }
+        .type-btn.active { background: #3498db; color: white; }
+
+        /* Equation Box */
+        .equation-box { background: #fff; border: 2px solid #e0e0e0; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .main-eq { font-size: 1.8em; color: #e74c3c; margin: 15px 0; font-weight: bold; display: block; }
+        .graph-given { color: #2980b9; font-weight: bold; border-bottom: 2px solid #2980b9; }
+        
+        /* Canvas Area */
+        .canvas-container { height: 400px; margin: 20px 0; border: 1px solid #ddd; border-radius: 8px; position: relative; background: white; cursor: crosshair; }
+        canvas { width: 100%; height: 100%; display: block; }
+        
+        /* Tooltip */
+        .tooltip { position: absolute; background: rgba(0,0,0,0.85); color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; pointer-events: none; display: none; transform: translate(-50%, -120%); z-index: 10; }
+
+        /* Controls */
+        .controls { background: #f9f9f9; padding: 20px; border-radius: 10px; border: 1px solid #ddd; }
+        .step-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .step-title { font-weight: bold; color: #2c3e50; font-size: 1.1em; margin: 0; }
+        
+        .input-group { margin: 10px 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+        
+        /* Buttons */
+        .btn-action { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-hint { padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 20px; font-size: 0.9em; cursor: pointer; font-weight: bold; }
+        .btn-hint:hover { background: #d68910; }
+        .btn-reset { background: #2c3e50; margin-top: 5px; }
+
+        /* Hints and Feedback */
+        #algebraHint { display: none; padding: 15px; background: #fff9db; border-left: 5px solid #f1c40f; margin-bottom: 15px; border-radius: 4px; text-align: left; }
+        .blue-part { color: #2980b9; font-weight: bold; }
+        #feedback { font-weight: bold; margin-top: 15px; padding: 10px; border-radius: 5px; display: none; }
+        
+        .success { background: #d4edda; color: #155724; display: block !important; }
+        .error { background: #f8d7da; color: #721c24; display: block !important; }
+        .warning { background: #fff3cd; color: #856404; display: block !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Solving Quadratic Equations Graphically</h2>
+
+    <div class="type-nav">
+        <button class="type-btn active" id="btn1" onclick="App.loadType(1)">Type 1</button>
+        <button class="type-btn" id="btn2" onclick="App.loadType(2)">Type 2</button>
+        <button class="type-btn" id="btn3" onclick="App.loadType(3)">Type 3</button>
+        <button class="type-btn" id="btn4" onclick="App.loadType('unknown')">Unknown Type</button>
+    </div>
+
+    <div class="equation-box">
+        <div>Using a graphical method, solve the equation:</div>
+        <span class="main-eq" id="problemDisplay">Generating...</span>
+        <p>You are given the graph of: <span class="graph-given" id="givenGraphText"></span></p>
+        <button class="btn-action btn-reset" onclick="App.fullReset()">New Question (Change Graph)</button>
+    </div>
+
+    <div class="canvas-container" id="canvasWrapper">
+        <canvas id="mainCanvas"></canvas>
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+
+    <div class="controls">
+        
+        <div class="step-header">
+            <h3 class="step-title">1. Identify the equation of the line to be added:</h3>
+            <button class="btn-hint" onclick="App.toggleHint()">💡 Need a Hint?</button>
+        </div>
+
+        <div id="algebraHint"></div>
+
+        <div class="input-group">
+            <input type="text" id="lineEqInput" placeholder="y = ...">
+            <button class="btn-action" onclick="App.plotUserLine()">Plot & Check</button>
+        </div>
+
+        <div id="stepFlow" style="display: none; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">
+            <div class="step-header">
+                <h3 class="step-title">2. How many solutions are there?</h3>
+                <select id="solCount" onchange="App.updateSolInputs()">
+                    <option value="">--Select--</option>
+                    <option value="2">2 solutions</option>
+                    <option value="1">1 solution</option>
+                    <option value="0">No solution</option>
+                </select>
+            </div>
+            
+            <div id="solInputsArea" style="display:none; margin-top: 15px;">
+                <h3 class="step-title">3. The solutions are:</h3>
+                <div id="xInputGroup" class="input-group"></div>
+            </div>
+            
+            <button class="btn-action" id="submitAnsBtn" onclick="App.validateSolutions()" style="display:none; margin-top: 15px;">Submit Answers</button>
+        </div>
+        <div id="feedback"></div>
+    </div>
+</div>
+
+<script>
+/**
+ * 1. GRAPHING ENGINE (Self-contained, no external libraries)
+ */
+const Grapher = {
+    canvas: null,
+    ctx: null,
+    width: 0, height: 0,
+    scaleX: 40, scaleY: 40, 
+    offsetX: 0, offsetY: 0,
+
+    init: function(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.canvas.addEventListener('mousemove', (e) => App.handleMouseMove(e));
+        this.canvas.addEventListener('mouseleave', () => { document.getElementById('tooltip').style.display = 'none'; });
+    },
+
+    resize: function() {
+        if(!this.canvas) return;
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        this.width = rect.width;
+        this.height = rect.height;
+        this.offsetX = this.width / 2;
+        this.offsetY = this.height / 2;
+        this.draw();
+    },
+
+    toCanvas: function(x, y) {
+        return { x: this.offsetX + (x * this.scaleX), y: this.offsetY - (y * this.scaleY) };
+    },
+
+    drawAxes: function() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.width, this.height);
+        
+        // Grid
+        ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1; ctx.beginPath();
+        for(let x = -10; x <= 10; x++) { let p = this.toCanvas(x,0); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, this.height); }
+        for(let y = -12; y <= 12; y++) { let p = this.toCanvas(0,y); ctx.moveTo(0, p.y); ctx.lineTo(this.width, p.y); }
+        ctx.stroke();
+
+        // Axes
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.beginPath();
+        let zero = this.toCanvas(0,0);
+        ctx.moveTo(0, zero.y); ctx.lineTo(this.width, zero.y);
+        ctx.moveTo(zero.x, 0); ctx.lineTo(zero.x, this.height);
+        ctx.stroke();
+
+        // Numbers
+        ctx.fillStyle = '#666'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+        for(let i=-8; i<=8; i+=2) { if(i!==0) ctx.fillText(i, this.toCanvas(i,0).x, zero.y+20); }
+        ctx.textAlign = 'right';
+        for(let i=-10; i<=10; i+=2) { if(i!==0) ctx.fillText(i, zero.x-8, this.toCanvas(0,i).y+4); }
+    },
+
+    plotFunction: function(func, color, width) {
+        const ctx = this.ctx;
+        ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width;
+        let first = true;
+        for(let x = -9; x <= 9; x += 0.1) {
+            let y = func(x);
+            if (y < -15 || y > 15) { first = true; continue; }
+            let p = this.toCanvas(x, y);
+            if(first) { ctx.moveTo(p.x, p.y); first=false; } else { ctx.lineTo(p.x, p.y); }
+        }
+        ctx.stroke();
+    },
+
+    plotDots: function(points) {
+        const ctx = this.ctx;
+        ctx.fillStyle = '#e74c3c';
+        points.forEach(pt => {
+            let p = this.toCanvas(pt.x, pt.y);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill();
+            pt.cx = p.x; pt.cy = p.y;
+        });
+    },
+
+    drawLabel: function(text, x, y, color) {
+        if (y < -11 || y > 11) return; // Don't draw if off screen
+        const ctx = this.ctx;
+        const p = this.toCanvas(x, y);
+        
+        ctx.font = 'bold 14px Arial';
+        const width = ctx.measureText(text).width + 10;
+        
+        // Background for readability
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.fillRect(p.x, p.y - 14, width, 18); 
+        
+        // Text
+        ctx.fillStyle = color;
+        ctx.textAlign = 'left';
+        ctx.fillText(text, p.x + 5, p.y);
+    },
+
+    draw: function() {
+        this.drawAxes();
+        
+        // 1. Draw Base Graph (Blue)
+        if(App.base) {
+            const f = x => (App.base.a*x*x + App.base.b*x + App.base.c);
+            this.plotFunction(f, '#2980b9', 3);
+            
+            // Label Base Graph
+            let lblX = 4.5;
+            let lblY = f(lblX);
+            if (lblY > 9 || lblY < -9) { lblX = -4.5; lblY = f(lblX); }
+            
+            const labelStr = App.formatEq(App.base.a, App.base.b, App.base.c, true);
+            this.drawLabel(labelStr, lblX, lblY, '#2980b9');
+        }
+
+        // 2. Draw User Line (Orange) if active
+        if(App.showLine && App.targetLine) {
+            const fLine = x => (App.targetLine.m*x + App.targetLine.c);
+            this.plotFunction(fLine, '#e67e22', 2);
+            this.plotDots(App.intersections);
+
+            // Label Line
+            let lineX = -5.5; 
+            let lineY = fLine(lineX);
+            
+            let m = App.targetLine.m;
+            let c = App.targetLine.c;
+            let lineStr = "y = " + (m===0 ? c : (m===1?"x":m===-1?"-x":m+"x") + (c>0?"+"+c : c<0?c : ""));
+            
+            this.drawLabel(lineStr, lineX, lineY, '#e67e22');
+        }
+    }
+};
+
+/**
+ * 2. APP LOGIC
+ */
+const App = {
+    currentMode: 1, 
+    base: {a:0, b:0, c:0},
+    prob: {a:0, b:0, c:0},
+    targetLine: {m:0, c:0},
+    intersections: [], 
+    showLine: false,
+
+    init: function() {
+        Grapher.init('mainCanvas');
+        this.fullReset(); // Generate the first graph
+    },
+
+    // Completely new graph (Base changes)
+    fullReset: function() {
+        this.base.a = (Math.random() > 0.5 ? 1 : -1);
+        this.base.b = (Math.floor(Math.random() * 5) - 2);
+        this.base.c = Math.floor(Math.random() * 4) - 2;
+        this.generateProblem();
+    },
+
+    // Switch Question Type (Base stays same)
+    loadType: function(type) {
+        this.currentMode = type;
+        document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+        const btnId = (type === 'unknown') ? 'btn4' : 'btn' + type;
+        document.getElementById(btnId).classList.add('active');
+        
+        // IMPORTANT: We do NOT call fullReset() here. 
+        // We call generateProblem() which uses the EXISTING this.base.
+        this.generateProblem();
+    },
+
+    generateProblem: function() {
+        // Start with the existing base graph coefficients
+        this.prob.a = this.base.a;
+        let m = 0, n = 0; 
+
+        // Determine which logic to use
+        let modeToUse = this.currentMode;
+        if (this.currentMode === 'unknown') {
+            modeToUse = Math.floor(Math.random() * 3) + 1;
+        }
+
+        if (modeToUse === 1) {
+            // Type 1: f(x) = 0
+            this.prob.b = this.base.b; this.prob.c = this.base.c;
+            // Target line is y = 0
+        } else if (modeToUse === 2) {
+            // Type 2: f(x) = k
+            this.prob.b = this.base.b;
+            let k = (Math.floor(Math.random() * 8) - 4); if(k===0) k=4;
+            this.prob.c = this.base.c - k;
+            n = k; // Target line is y = k
+        } else { 
+            // Type 3: f(x) = mx + n
+            m = (Math.random() > 0.5 ? 1 : -1);
+            n = (Math.floor(Math.random() * 6) - 3);
+            this.prob.b = this.base.b - m;
+            this.prob.c = this.base.c - n;
+        }
+
+        this.targetLine = { m: m, c: n };
+        this.calculateRoots();
+
+        // Update Text
+        document.getElementById('problemDisplay').innerText = this.formatEq(this.prob.a, this.prob.b, this.prob.c) + " = 0";
+        document.getElementById('givenGraphText').innerText = this.formatEq(this.base.a, this.base.b, this.base.c, true);
+        
+        // Generate Hint Content
+        let diffB = this.prob.b - this.base.b;
+        let diffC = this.prob.c - this.base.c;
+        let tail = "";
+        if (diffB !== 0) tail += (diffB > 0 ? " + " : " - ") + (Math.abs(diffB) === 1 ? "" : Math.abs(diffB)) + "x";
+        if (diffC !== 0) tail += (diffC > 0 ? " + " : " - ") + Math.abs(diffC);
+        
+        document.getElementById('algebraHint').innerHTML = 
+            `Rearrange the problem equation so the LHS matches the given graph:<br>` +
+            `<b><span class="blue-part">${this.formatEq(this.base.a, this.base.b, this.base.c)}</span>${tail} = 0</b>` +
+            `<br><br>Now, move the extra terms (black text) to the right side to find the line equation (y = ...).`;
+
+        // Reset UI Elements for the new question
+        this.showLine = false;
+        document.getElementById('lineEqInput').value = "";
+        document.getElementById('stepFlow').style.display = "none";
+        document.getElementById('feedback').style.display = "none";
+        document.getElementById('algebraHint').style.display = "none";
+        document.getElementById('solCount').value = "";
+        
+        // Re-draw graph (Base stays, user line disappears)
+        Grapher.draw();
+    },
+
+    calculateRoots: function() {
+        const {a, b, c} = this.prob;
+        let d = b*b - 4*a*c;
+        let roots = [];
+        if (d >= 0) {
+            if (Math.abs(d) < 0.0001) roots = [-b/(2*a)];
+            else roots = [(-b - Math.sqrt(d))/(2*a), (-b + Math.sqrt(d))/(2*a)];
+        }
+        roots.sort((a,b)=>a-b);
+        this.intersections = roots.map(x => ({ x: x, y: this.targetLine.m * x + this.targetLine.c }));
+    },
+
+    plotUserLine: function() {
+        let raw = document.getElementById('lineEqInput').value.replace(/\s+/g, '').toLowerCase();
+        
+        if (!raw.startsWith('y=')) return this.showFeedback("Remember the equation starts with y = ", "warning");
+        
+        let rhs = raw.substring(2);
+        let userM = 0, userC = 0;
+        if(rhs.includes('x')) {
+            let parts = rhs.split('x');
+            // Parse coefficients like "x", "-x", "2x", etc.
+            userM = (parts[0]==='' || parts[0]==='+') ? 1 : (parts[0]==='-') ? -1 : parseFloat(parts[0]);
+            userC = (parts[1]==='' || parts[1]==='+') ? 0 : parseFloat(parts[1]);
+        } else {
+            userC = parseFloat(rhs);
+        }
+
+        // Validate
+        if (Math.abs(userM - this.targetLine.m) < 0.1 && Math.abs(userC - this.targetLine.c) < 0.1) {
+            this.showLine = true;
+            Grapher.draw();
+            document.getElementById('stepFlow').style.display = 'block';
+            this.showFeedback("Correct! The line is added and intersections marked.", "success");
+        } else {
+            this.showFeedback("Incorrect equation. Check the hint!", "error");
+        }
+    },
+
+    updateSolInputs: function() {
+        const val = document.getElementById('solCount').value;
+        const group = document.getElementById('xInputGroup');
+        const area = document.getElementById('solInputsArea');
+        const btn = document.getElementById('submitAnsBtn');
+        
+        group.innerHTML = "";
+        if (val === "0") {
+            area.style.display = "none"; btn.style.display = "block";
+        } else if (val === "1" || val === "2") {
+            area.style.display = "block"; btn.style.display = "block";
+            if (val === "2") group.innerHTML = 'x₁: <input type="number" id="x1" step="0.01"> &nbsp; x₂: <input type="number" id="x2" step="0.01">';
+            else group.innerHTML = 'x₁: <input type="number" id="x1" step="0.01">';
+        } else {
+            area.style.display = "none"; btn.style.display = "none";
+        }
+    },
+
+    validateSolutions: function() {
+        const userCount = parseInt(document.getElementById('solCount').value);
+        const actualCount = this.intersections.length;
+        
+        if (userCount !== actualCount) return this.showFeedback("Wrong number of solutions.", "error");
+        
+        // --- CHANGE START: Updated feedback message ---
+        if (actualCount === 0) return this.showFeedback("Correct! No intersections so there are no real solutions.", "success");
+        // --- CHANGE END ---
+
+        let userVals = [parseFloat(document.getElementById('x1').value)];
+        if (userCount === 2) userVals.push(parseFloat(document.getElementById('x2').value));
+        userVals.sort((a,b) => a-b);
+        
+        const isCorrect = userVals.every((v, i) => !isNaN(v) && Math.abs(v - this.intersections[i].x) < 0.25);
+        
+        isCorrect ? this.showFeedback("Correct! Well done.", "success") 
+                  : this.showFeedback("Incorrect x-values. Check the graph dots.", "error");
+    },
+
+    handleMouseMove: function(e) {
+        if (!this.showLine) return;
+        const rect = Grapher.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const tooltip = document.getElementById('tooltip');
+        
+        let hit = false;
+        this.intersections.forEach(pt => {
+            let dist = Math.sqrt((mx - pt.cx)**2 + (my - pt.cy)**2);
+            if(dist < 10) {
+                tooltip.style.left = pt.cx + 'px';
+                tooltip.style.top = pt.cy + 'px';
+                tooltip.innerText = `(${pt.x.toFixed(2)}, ${pt.y.toFixed(2)})`;
+                tooltip.style.display = 'block';
+                hit = true;
+            }
+        });
+        if(!hit) tooltip.style.display = 'none';
+    },
+
+    formatEq: function(a, b, c, isYPrefix) {
+        let res = isYPrefix ? "y = " : "";
+        if (a !== 0) res += (a === 1 ? "" : (a === -1 ? "-" : a)) + "x²";
+        if (b !== 0) {
+            let bSign = b > 0 ? (res.length > (isYPrefix?4:0) ? " + " : "") : (res.length > (isYPrefix?4:0) ? " - " : "-");
+            res += bSign + (Math.abs(b) === 1 ? "" : Math.abs(b)) + "x";
+        }
+        if (c !== 0) {
+            let cSign = c > 0 ? (res.length > (isYPrefix?4:0) ? " + " : "") : (res.length > (isYPrefix?4:0) ? " - " : "-");
+            res += cSign + Math.abs(c);
+        }
+        return (res === "" || res === "y = ") ? (isYPrefix ? "y = 0" : "0") : res;
+    },
+
+    toggleHint: function() {
+        const h = document.getElementById('algebraHint');
+        h.style.display = h.style.display === 'block' ? 'none' : 'block';
+    },
+
+    showFeedback: function(m, t) {
+        const f = document.getElementById('feedback');
+        f.innerText = m; f.className = t; f.style.display = 'block';
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => App.init());
+</script>
+</body>
+</html>
